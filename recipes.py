@@ -12,6 +12,7 @@
 # Imports
 import tkinter as tk
 from tkinter import ttk
+from tkinter import font
 import pandas as pd
 import numpy as np
 
@@ -164,14 +165,6 @@ def sort_by_makable(recipe_book, all_groceries):
     recipe_book = recipe_book.reindex()
     return recipe_book
 
-def sort_recipes(recipe_book, sort_criteria):
-    """Basic Sort Function - database defaults"""
-    if sort_criteria in recipe_book.columns:
-        recipe_book = recipe_book.sort_values(by=sort_criteria)
-    if sort_criteria == 'Total Cook Time':
-        recipe_book = recipe_book.sort_values(by='prep_time', key=recipe_book['cook_time'].add)
-    return recipe_book
-
 # Tkinter Functions Functions
 def create_scroll_list(root, recipe_book, all_groceries):
     """Create a Scrollbar and Listbox"""
@@ -191,7 +184,9 @@ def create_scroll_tb(root, recipe_book):
     tb_scroll = tk.Scrollbar(frame)
     tb_scroll.pack(side=tk.RIGHT)
     # Textbox
-    textbox = tk.Text(frame, wrap='word', state='disabled')
+    small_font = font.Font(family='Segoe UI', size=12)
+    textbox = tk.Text(frame, wrap='word', state='disabled', font=small_font,
+                      width=25, height=11)
     textbox.pack(side=tk.LEFT)
     return frame, textbox
 
@@ -206,11 +201,12 @@ def update_scroll_list(which_listbox, recipe_book, all_groceries):
             which_listbox.itemconfig(index, bg='#D3D3D3')
     return 0
 
-def show_selected_recipe(recipe_book, textbox, recipe_index):
+def show_selected_recipe(recipe_book, textbox, sorted_index):
     """Show instructions for selected recipe"""
     textbox.config(state=tk.NORMAL)
     textbox.delete(1.0, tk.END)
-    recipe = recipe_book.loc[recipe_index, 'name']
+    recipe = recipe_book.take([sorted_index])['name'].values[0]
+    recipe_index = get_index(recipe_book, recipe, 'name')
     ingredients = get_ingredients(recipe_book, recipe)
     directions = get_directions(recipe_book, recipe)
     prep_time = '\nPrep Time: ' + str(recipe_book.loc[recipe_index, 'prep_time']) + '\n'
@@ -225,23 +221,38 @@ def show_selected_recipe(recipe_book, textbox, recipe_index):
     for _, step in enumerate(directions):
         textbox.insert(tk.END, str(step[0]) + ') ' + step[1] + '\n')
     textbox.config(state=tk.DISABLED)
-    # return textbox
 
-def sort():
+def on_select(event, selected, textbox, recipe_book):
+    """Shows instructions for selected recipe"""
+    if len(selected) == 1:
+        show_selected_recipe(recipe_book, textbox, selected[0])
+
+def sort(sort_criteria, listbox):
     """Sort function"""
-    print("Sort Button Pressed")
+    global recipes_list, grocery_list
+    if sort_criteria == 'Recipe Name':
+        recipes_list = recipes_list.sort_values(by='name')
+    elif sort_criteria == 'Total Cook Time':
+        recipes_list['total_time'] = recipes_list['cook_time'] + recipes_list['prep_time']
+        recipes_list = recipes_list.sort_values(by='total_time')
+        recipes_list = recipes_list.drop('total_time', axis=1)
+    elif sort_criteria == 'Makable':
+        recipes_list = sort_by_makable(recipes_list, grocery_list)
+    update_scroll_list(listbox, recipes_list, grocery_list)
+
+def add():
+    """Add to Groceries"""
+    print("Add Button Pressed")
+
+def remove():
+    """Remove from Groceries"""
+    print("Remove Button Pressed")
 
 # Tkinter
 def main():
+    """Main Loop - Tkinter"""
     global recipes_list, grocery_list
 
-    def on_select(event, textbox):
-        """Shows instructions for selected recipe"""
-        selected = list_lb.curselection()
-        if len(selected) == 1:
-            show_selected_recipe(recipes_list, textbox, selected[0])
-
-    """Tkinter Window"""
     # Initialize Screen
     root = tk.Tk()
     root.title = 'Recipes'
@@ -264,7 +275,7 @@ def main():
     sort_frame.pack(side=tk.TOP)
     tk.Label(sort_frame, text='Sort By: ').pack(side=tk.LEFT)
     sort_by = ttk.Combobox(sort_frame, values=['Recipe Name', 'Makable',
-                                               '# of Ingredients', 'Total Cook Time'])
+                                               'Total Cook Time'])
     sort_by.set('Makable')
     sort_by.pack(side=tk.LEFT)
 
@@ -284,12 +295,25 @@ def main():
 
     list_lb_frame, list_lb = create_scroll_list(list_frame, recipes_list, grocery_list)
     list_lb_frame.pack(side=tk.TOP, padx=padding, pady=padding)
-    list_lb.bind('<<ListboxSelect>>', lambda event: on_select(event, recipe_tb))
+    list_lb.bind('<<ListboxSelect>>', lambda event: on_select(event, list_lb.curselection(),
+                                                              recipe_tb, recipes_list))
+
+    # Add - Frame, Label
+    add_frame = tk.Frame(root)
+    add_frame.pack(side=tk.TOP, padx=padding, pady=padding)
 
     # Buttons
     sort_button = tk.Button(sort_frame, text="Sort",
-                       width=button_w, height=button_h, command=sort)
+                       width=button_w, height=button_h, command= lambda: sort(sort_by.get(), list_lb))
     sort_button.pack(side=tk.LEFT, padx=padding, pady=padding)
+
+    add_button = tk.Button(add_frame, text="Add to Groceries",
+                       width=button_w*2, height=button_h, command=add)
+    add_button.pack(side=tk.LEFT, padx=padding, pady=padding)
+
+    remove_button = tk.Button(add_frame, text="Remove from Groceries",
+                       width=button_w*2, height=button_h, command=remove)
+    remove_button.pack(side=tk.LEFT, padx=padding, pady=padding)
 
     # Main Loop
     root.mainloop()
