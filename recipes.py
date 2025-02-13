@@ -27,7 +27,7 @@ def get_index(which_list, looking_for, column_name):
 
 def is_in_list(which_list, looking_for, column_name):
     """Checks if looking_for is in column_name in which_list"""
-    return np.isin(which_list[column_name].values, looking_for)[0]
+    return np.isin(which_list[column_name].values, looking_for).any()
 
 def get_ingredients(recipe_book, which_recipe):
     """Returns 2d array of ingredient amount and name"""
@@ -59,6 +59,23 @@ def get_groceries(all_groceries, where):
         groc_name = row.loc['food']
         groc_array = np.append(groc_array, np.array([[groc_amount, groc_name]]), axis=0)
     return groc_array
+
+def get_directions(recipe_book, which_recipe):
+    """Returns 2d array of step number and direction given recipe name"""
+    if is_in_list(recipe_book, which_recipe, 'name'):
+        # List of directions in one string
+        directions = recipe_book.at[get_index(recipe_book, which_recipe, 'name'),
+                                    'directions']
+        # Splits directions by commas
+        directions = directions.split(',')
+        direction_array = np.empty((0, 2))
+        for num, step in enumerate(directions):
+            if step[0] == ' ':
+                step = step[1:]
+            direction_array = np.append(direction_array,
+                                        np.array([[int(num+1), step]]),
+                                        axis=0)
+        return direction_array
 
 def num_missing_ing(recipe_book, which_recipe, all_groceries, which_food):
     """Returns an int representing the number of which_food missing to make which_recipe"""
@@ -128,14 +145,24 @@ def find_makeable(recipe_book, all_groceries):
             makeable_recipes = np.append(makeable_recipes, np.array([recipe_name]))
     return makeable_recipes
 
-# Sorting by Makable:
-#   Have all ingrdients & amounts
-#   Missing 1 ingredient
-#   Missing 2 ingredients, etc, etc
-
 def sort_by_makable(recipe_book, all_groceries):
     """Given recipes_list and groceries_list, returns sorted reciepes by makablity"""
-    return np.array([])
+    indexes = np.empty((0, 3)) # index, makable %, # missing
+    for _, recipe in recipe_book.iterrows():
+        recipe_name = recipe['name']
+        ind = get_index(recipe_book, recipe_name, 'name')
+        make_per = makable_percentage(recipe_book, recipe['name'], all_groceries)
+        num_miss = total_missing_ing(recipe_book, recipe['name'], all_groceries)
+        indexes = np.append(indexes, np.array([[ind, make_per, num_miss]]), axis=0)
+    # Sort by % makable
+    indexes = indexes[indexes[:, 1].argsort()][::-1]
+    # Sort by missing ingredients
+    indexes = indexes[indexes[:, 2].argsort()]
+    # Sort and return recipe_book
+    indexes = indexes[:, 0]
+    indexes = np.transpose(indexes)
+    recipe_book = recipe_book.reindex()
+    return recipe_book
 
 def sort_by(recipe_book, sort_criteria):
     """Basic Sort Function - database defaults"""
@@ -145,8 +172,70 @@ def sort_by(recipe_book, sort_criteria):
         recipe_book = recipe_book.sort_values(by='prep_time', key=recipe_book['cook_time'].add)
     return recipe_book
 
+# Tkinter Functions Functions
+def create_scroll_list(root, recipe_book, all_groceries):
+    """Create a Scrollbar and Listbox"""
+    frame = tk.Frame(root)
+    list_scroll = tk.Scrollbar(frame)
+    list_scroll.pack(side=tk.RIGHT)
+    # Listboxes
+    list_box = tk.Listbox(frame, yscrollcommand=list_scroll.set)
+    update_scroll_list(list_box, recipe_book, all_groceries)
+    list_box.pack(side=tk.LEFT)
+    list_scroll.config(command=list_box.yview)
+    return frame, list_box
+
+def create_scroll_tb(root, recipe_book):
+    """Create Textbox to show recipe instructions"""
+    frame = tk.Frame(root)
+    tb_scroll = tk.Scrollbar(frame)
+    tb_scroll.pack(side=tk.RIGHT)
+    # Textbox
+    textbox = tk.Text(frame, wrap='word', state='disabled')
+    textbox.pack(side=tk.LEFT)
+    return frame, textbox
+
+def update_scroll_list(which_listbox, recipe_book, all_groceries):
+    """Update Listbox"""
+    which_listbox.delete(0, tk.END)
+    for index, recipe in recipe_book.iterrows():
+        recipe_name = recipe['name']
+        which_listbox.insert(tk.END, recipe_name)
+        # Highlights makable recipes
+        if makable_percentage(recipe_book, recipe_name, all_groceries) == 1.0:
+            which_listbox.itemconfig(index, bg='#D3D3D3')
+    return 0
+
+def show_selected_recipe(recipe_book, textbox, recipe_index):
+    """Show instructions for selected recipe"""
+    textbox.config(state=tk.NORMAL)
+    textbox.delete(1.0, tk.END)
+    recipe = recipe_book.loc[recipe_index, 'name']
+    ingredients = get_ingredients(recipe_book, recipe)
+    directions = get_directions(recipe_book, recipe)
+    prep_time = '\nPrep Time: ' + str(recipe_book.loc[recipe_index, 'prep_time']) + '\n'
+    cook_time = 'Cook Time: ' + str(recipe_book.loc[recipe_index, 'cook_time']) + '\n'
+    textbox.insert(tk.END, recipe.upper())
+    textbox.insert(tk.END, prep_time)
+    textbox.insert(tk.END, cook_time)
+    textbox.insert(tk.END, '\nIngredients:\n')
+    for _, ing in enumerate(ingredients):
+        textbox.insert(tk.END, str(ing[0]) + ' ' + ing[1] + '\n')
+    textbox.insert(tk.END, '\nDirections:\n')
+    for _, step in enumerate(directions):
+        textbox.insert(tk.END, str(step[0]) + ') ' + step[1] + '\n')
+    textbox.config(state=tk.DISABLED)
+    # return textbox
+
 # Tkinter
 def main():
+    global recipes_list, grocery_list
+
+    def on_select(event, textbox):
+        """Shows instructions for selected recipe"""
+        selected = list_lb.curselection()
+        show_selected_recipe(recipes_list, textbox, selected[0])
+
     """Tkinter Window"""
     # Initialize Screen
     root = tk.Tk()
@@ -172,6 +261,24 @@ def main():
                                                '# of Ingredients', 'Total Cook Time'])
     sort_by.set('Makable')
     sort_by.pack(side=tk.LEFT)
+
+    # Recipe List and Recipe - Frame, Label, Scrollable ListBox
+    list_recipe_frame = tk.Frame(root)
+    list_recipe_frame.pack(side=tk.TOP)
+    list_frame = tk.Frame(list_recipe_frame)
+    list_frame.pack(side=tk.LEFT)
+    recipe_frame = tk.Frame(list_recipe_frame)
+    recipe_frame.pack(side=tk.LEFT)
+
+    tk.Label(list_frame, text='Recipes List').pack(side=tk.TOP)
+    tk.Label(recipe_frame, text='Selected Recipe').pack(side=tk.TOP)
+
+    recipe_lb_frame, recipe_tb = create_scroll_tb(recipe_frame, recipes_list)
+    recipe_lb_frame.pack(side=tk.TOP)
+
+    list_lb_frame, list_lb = create_scroll_list(list_frame, recipes_list, grocery_list)
+    list_lb_frame.pack(side=tk.TOP)
+    list_lb.bind('<<ListboxSelect>>', lambda event: on_select(event, recipe_tb))
 
     # Main Loop
     root.mainloop()
