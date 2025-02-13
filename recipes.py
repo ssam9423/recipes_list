@@ -164,7 +164,7 @@ def sort_by_makable(recipe_book, all_groceries):
     recipe_book = recipe_book.reindex()
     return recipe_book
 
-def sort_by(recipe_book, sort_criteria):
+def sort_recipes(recipe_book, sort_criteria):
     """Basic Sort Function - database defaults"""
     if sort_criteria in recipe_book.columns:
         recipe_book = recipe_book.sort_values(by=sort_criteria)
@@ -227,6 +227,10 @@ def show_selected_recipe(recipe_book, textbox, recipe_index):
     textbox.config(state=tk.DISABLED)
     # return textbox
 
+def sort():
+    """Sort function"""
+    print("Sort Button Pressed")
+
 # Tkinter
 def main():
     global recipes_list, grocery_list
@@ -234,7 +238,8 @@ def main():
     def on_select(event, textbox):
         """Shows instructions for selected recipe"""
         selected = list_lb.curselection()
-        show_selected_recipe(recipes_list, textbox, selected[0])
+        if len(selected) == 1:
+            show_selected_recipe(recipes_list, textbox, selected[0])
 
     """Tkinter Window"""
     # Initialize Screen
@@ -243,6 +248,7 @@ def main():
     screen_w = 800
     screen_h = 600
     button_w = 10
+    button_h = 1
     padding = int(screen_w/100)
     screen_size = str(screen_w) + 'x' + str(screen_h)
     root.geometry(screen_size)
@@ -264,21 +270,26 @@ def main():
 
     # Recipe List and Recipe - Frame, Label, Scrollable ListBox
     list_recipe_frame = tk.Frame(root)
-    list_recipe_frame.pack(side=tk.TOP)
+    list_recipe_frame.pack(side=tk.TOP, padx=padding, pady=padding)
     list_frame = tk.Frame(list_recipe_frame)
-    list_frame.pack(side=tk.LEFT)
+    list_frame.pack(side=tk.LEFT, padx=padding, pady=padding)
     recipe_frame = tk.Frame(list_recipe_frame)
-    recipe_frame.pack(side=tk.LEFT)
+    recipe_frame.pack(side=tk.LEFT, padx=padding, pady=padding)
 
     tk.Label(list_frame, text='Recipes List').pack(side=tk.TOP)
     tk.Label(recipe_frame, text='Selected Recipe').pack(side=tk.TOP)
 
     recipe_lb_frame, recipe_tb = create_scroll_tb(recipe_frame, recipes_list)
-    recipe_lb_frame.pack(side=tk.TOP)
+    recipe_lb_frame.pack(side=tk.TOP, padx=padding, pady=padding)
 
     list_lb_frame, list_lb = create_scroll_list(list_frame, recipes_list, grocery_list)
-    list_lb_frame.pack(side=tk.TOP)
+    list_lb_frame.pack(side=tk.TOP, padx=padding, pady=padding)
     list_lb.bind('<<ListboxSelect>>', lambda event: on_select(event, recipe_tb))
+
+    # Buttons
+    sort_button = tk.Button(sort_frame, text="Sort",
+                       width=button_w, height=button_h, command=sort)
+    sort_button.pack(side=tk.LEFT, padx=padding, pady=padding)
 
     # Main Loop
     root.mainloop()
