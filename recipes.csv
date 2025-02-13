@@ -1,0 +1,4 @@
+name,ingredients,prep_time,cook_time,directions
+"soup","1 carrot, 1 celery, 1 onion, 1 chicken stock, 1 chicken",20,40,"cut vegetables, put chicken in pot, cook chicken, shred chicken, cook vegetables, put in chicken stock, simmer, serve"
+"sandwich","1 bread, 1 lettuce, 1 tomato, 1 chicken",5,5,"put ingredients on bread, enjoy"
+"chicken and rice","1 chicken, 1 rice, 1 chicken stock",10,30,"cut chicken into pieces, cook in pot, add rice and chicken stock, simmer for 20 minutes"
