@@ -54,9 +54,12 @@ def get_ingredients(recipe_book, which_recipe):
 def get_groceries(all_groceries, where):
     """Returns 2d array of item amount and name that are in_stock"""
     groc_list = all_groceries.loc[all_groceries[where]]
+    which_amount = 'stocked_num'
+    if where == 'need_to_buy':
+        which_amount = 'buy_num'
     groc_array = np.empty((0, 2))
     for _, row in groc_list.iterrows():
-        groc_amount = row.loc['amount']
+        groc_amount = row.loc[which_amount]
         groc_name = row.loc['food']
         groc_array = np.append(groc_array, np.array([[groc_amount, groc_name]]), axis=0)
     return groc_array
@@ -137,24 +140,31 @@ def makable_percentage(recipe_book, which_recipe, all_groceries):
         makable_perc = (total - missing) / total
     return makable_perc
 
+def is_makable(recipe_book, which_recipe, all_groceries):
+    """Returns boolean representing if which_recipe is makable"""
+    if is_in_list(recipe_book, which_recipe, 'name'):
+        if makable_percentage(recipe_book, which_recipe, all_groceries) == 1.0:
+            return True
+    return False
+
 def find_makeable(recipe_book, all_groceries):
     """Returns 1d array of names of recipes that are makable with items in fridge"""
     makeable_recipes = np.array([])
     for _, recipe in recipe_book.iterrows():
         recipe_name = recipe.loc['name']
-        if makable_percentage(recipe_book, recipe_name, all_groceries) == 1.0:
+        if is_makable(recipe_book, recipe_name, all_groceries):
             makeable_recipes = np.append(makeable_recipes, np.array([recipe_name]))
     return makeable_recipes
 
 def sort_by_makable(recipe_book, all_groceries):
     """Given recipes_list and groceries_list, returns sorted reciepes by makablity"""
     indexes = np.empty((0, 3)) # index, makable %, # missing
-    for _, recipe in recipe_book.iterrows():
+    for index, recipe in recipe_book.iterrows():
         recipe_name = recipe['name']
-        ind = get_index(recipe_book, recipe_name, 'name')
-        make_per = makable_percentage(recipe_book, recipe['name'], all_groceries)
-        num_miss = total_missing_ing(recipe_book, recipe['name'], all_groceries)
-        indexes = np.append(indexes, np.array([[ind, make_per, num_miss]]), axis=0)
+        # ind = get_index(recipe_book, recipe_name, 'name')
+        make_per = makable_percentage(recipe_book, recipe_name, all_groceries)
+        num_miss = total_missing_ing(recipe_book, recipe_name, all_groceries)
+        indexes = np.append(indexes, np.array([[index, make_per, num_miss]]), axis=0)
     # Sort by % makable
     indexes = indexes[indexes[:, 1].argsort()][::-1]
     # Sort by missing ingredients
@@ -162,7 +172,7 @@ def sort_by_makable(recipe_book, all_groceries):
     # Sort and return recipe_book
     indexes = indexes[:, 0]
     indexes = np.transpose(indexes)
-    recipe_book = recipe_book.reindex()
+    recipe_book = recipe_book.reindex(indexes)
     return recipe_book
 
 # Tkinter Functions Functions
@@ -178,7 +188,7 @@ def create_scroll_list(root, recipe_book, all_groceries):
     list_scroll.config(command=list_box.yview)
     return frame, list_box
 
-def create_scroll_tb(root, recipe_book):
+def create_scroll_tb(root):
     """Create Textbox to show recipe instructions"""
     frame = tk.Frame(root)
     tb_scroll = tk.Scrollbar(frame)
@@ -193,12 +203,14 @@ def create_scroll_tb(root, recipe_book):
 def update_scroll_list(which_listbox, recipe_book, all_groceries):
     """Update Listbox"""
     which_listbox.delete(0, tk.END)
-    for index, recipe in recipe_book.iterrows():
+    index = 0
+    for _, recipe in recipe_book.iterrows():
         recipe_name = recipe['name']
         which_listbox.insert(tk.END, recipe_name)
         # Highlights makable recipes
-        if makable_percentage(recipe_book, recipe_name, all_groceries) == 1.0:
+        if is_makable(recipe_book, recipe_name, all_groceries):
             which_listbox.itemconfig(index, bg='#D3D3D3')
+        index += 1
     return 0
 
 def show_selected_recipe(recipe_book, textbox, sorted_index):
@@ -242,10 +254,26 @@ def sort(sort_criteria, listbox):
 
 def add():
     """Add to Groceries"""
+    # From which_recipe, get all ingredients
+    # From grocery_list, get all groceries
+    # If ingredient is not in stocked groceries
+    #   If ingredient is in grocery_list
+    #       Move food to cart -> change amount to ingredient amount
+    #   If ingredient is not in grocery_list
+    #       Add food to grocery_list -> set amount ot ingredient amount
+    # If ingredient is in stocked groceries
+    #   If stocked_num < ing num
+    #       Add (ing num - stocked_num) to buy_num
     print("Add Button Pressed")
 
 def remove():
     """Remove from Groceries"""
+    # From which_recipe, get all ingredients
+    # From grocery_list, get all groceries
+    # If ingredient is not in stocked groceries
+    #   If ingredient is in grocery_list
+    #       subtract ingredient amount from buy_num
+    #       if buy_num <= 0, need_to_buy = False
     print("Remove Button Pressed")
 
 # Tkinter
@@ -290,7 +318,7 @@ def main():
     tk.Label(list_frame, text='Recipes List').pack(side=tk.TOP)
     tk.Label(recipe_frame, text='Selected Recipe').pack(side=tk.TOP)
 
-    recipe_lb_frame, recipe_tb = create_scroll_tb(recipe_frame, recipes_list)
+    recipe_lb_frame, recipe_tb = create_scroll_tb(recipe_frame)
     recipe_lb_frame.pack(side=tk.TOP, padx=padding, pady=padding)
 
     list_lb_frame, list_lb = create_scroll_list(list_frame, recipes_list, grocery_list)
@@ -304,15 +332,16 @@ def main():
 
     # Buttons
     sort_button = tk.Button(sort_frame, text="Sort",
-                       width=button_w, height=button_h, command= lambda: sort(sort_by.get(), list_lb))
+                            width=button_w, height=button_h,
+                            command= lambda: sort(sort_by.get(), list_lb))
     sort_button.pack(side=tk.LEFT, padx=padding, pady=padding)
 
     add_button = tk.Button(add_frame, text="Add to Groceries",
-                       width=button_w*2, height=button_h, command=add)
+                           width=button_w*2, height=button_h, command=add)
     add_button.pack(side=tk.LEFT, padx=padding, pady=padding)
 
     remove_button = tk.Button(add_frame, text="Remove from Groceries",
-                       width=button_w*2, height=button_h, command=remove)
+                              width=button_w*2, height=button_h, command=remove)
     remove_button.pack(side=tk.LEFT, padx=padding, pady=padding)
 
     # Main Loop
