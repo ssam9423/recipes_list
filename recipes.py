@@ -6,7 +6,7 @@
 #   Allow multiple recipes (add to amount rather than replace)
 #   If ingredient is in fridge, but need more, do math to find amount needed
 
-# Recipes CSV: name,ingredients,prep_time,cook_time,directions
+# Recipes CSV: name,ingredients,prep_time,cook_time,directions,add_to_groceries
 # Groceries CSV: food,food_type,is_stocked,is_low,need_to_buy,amount,in_cart
 
 # Imports
@@ -29,6 +29,11 @@ def get_index(which_list, looking_for, column_name):
 def is_in_list(which_list, looking_for, column_name):
     """Checks if looking_for is in column_name in which_list"""
     return np.isin(which_list[column_name].values, looking_for).any()
+
+def added_to_groceries(which_list, looking_for):
+    """Returns if recipe is added to grocery list"""
+    food_index = get_index(which_list, looking_for, 'name')
+    return which_list.at[food_index, 'add_to_groceries']
 
 def get_ingredients(recipe_book, which_recipe):
     """Returns 2d array of ingredient amount and name"""
@@ -209,7 +214,9 @@ def update_scroll_list(which_listbox, recipe_book, all_groceries):
         which_listbox.insert(tk.END, recipe_name)
         # Highlights makable recipes
         if is_makable(recipe_book, recipe_name, all_groceries):
-            which_listbox.itemconfig(index, bg='#D3D3D3')
+            which_listbox.itemconfig(index, bg='#C6DAAD')
+        if added_to_groceries(recipe_book, recipe_name,):
+            which_listbox.itemconfig(index, bg='#D0E6F5')
         index += 1
     return 0
 
@@ -252,29 +259,68 @@ def sort(sort_criteria, listbox):
         recipes_list = sort_by_makable(recipes_list, grocery_list)
     update_scroll_list(listbox, recipes_list, grocery_list)
 
-def add():
+def add(to_add, which_listbox):
     """Add to Groceries"""
-    # From which_recipe, get all ingredients
-    # From grocery_list, get all groceries
-    # If ingredient is not in stocked groceries
-    #   If ingredient is in grocery_list
-    #       Move food to cart -> change amount to ingredient amount
-    #   If ingredient is not in grocery_list
-    #       Add food to grocery_list -> set amount ot ingredient amount
-    # If ingredient is in stocked groceries
-    #   If stocked_num < ing num
-    #       Add (ing num - stocked_num) to buy_num
-    print("Add Button Pressed")
+    global recipes_list, grocery_list
+    for index in to_add:
+        recipes_list.at[index, 'add_to_groceries'] = True
+    update_scroll_list(which_listbox, recipes_list, grocery_list)
 
-def remove():
+def remove(to_remove, which_listbox):
     """Remove from Groceries"""
-    # From which_recipe, get all ingredients
-    # From grocery_list, get all groceries
-    # If ingredient is not in stocked groceries
-    #   If ingredient is in grocery_list
-    #       subtract ingredient amount from buy_num
-    #       if buy_num <= 0, need_to_buy = False
-    print("Remove Button Pressed")
+    global recipes_list, grocery_list
+    for index in to_remove:
+        recipes_list.at[index, 'add_to_groceries'] = False
+    update_scroll_list(which_listbox, recipes_list, grocery_list)
+
+def consolidate(ing_list1, ing_list2):
+    """Takes 2 ingredient lists and consolidates into one list, adding amounts"""
+    for ing in ing_list2:
+        # ing[0] = amount, ing[1] = name
+        if np.isin(ing_list1[:,1], ing[1]).any():
+            row, _ = np.where(ing_list1 == ing[1])
+            row = row[0]
+            ing_list1[row][0] = int(ing_list1[row][0]) + int(ing[0])
+        else:
+            ing_list1 = np.append(ing_list1, np.array([ing]), axis=0)
+    return ing_list1
+
+def update_groceries(recipe_book):
+    """Updates groceries to add ingredients to grocery csv"""
+    global grocery_list
+    recipes_to_make = recipe_book[recipe_book['add_to_groceries']]['name'].values
+    all_ingredients = np.empty((0,2))
+    for recipe_name in recipes_to_make:
+        recipe_ingredients = get_ingredients(recipe_book, recipe_name)
+        all_ingredients = consolidate(all_ingredients, recipe_ingredients)
+    for ingredient in all_ingredients:
+        ing_name = ingredient[1]
+        ing_amount = int(ingredient[0])
+        # If ingredient is in grocery list
+        if is_in_list(grocery_list, ing_name, 'food'):
+            ing_index = get_index(grocery_list, ing_name, 'food')
+            # If ingredient is stocked
+            if grocery_list.at[ing_index, 'is_stocked']:
+                stocked_amount = grocery_list.at[ing_index, 'stocked_num']
+                add_amount = stocked_amount - ing_amount
+                # If amount stocked is not sufficient
+                if add_amount > 0:
+                    grocery_list.at[ing_index, 'need_to_buy'] = True
+                    grocery_list.at[ing_index, 'buy_num'] += add_amount
+            # If ingredient is in to buy list
+            elif grocery_list.at[ing_index, 'need_to_buy']:
+                grocery_list.at[ing_index, 'buy_num'] += ing_amount
+            # If ingredient is in past items
+            else:
+                grocery_list.at[ing_index, 'need_to_buy'] = True
+                grocery_list.at[ing_index, 'buy_num'] = ing_amount
+        # If ingredient is not in grocery list
+        else:
+            new_item = [ing_name, '', False, 0, True, ing_amount, False]
+            grocery_list.loc[len(grocery_list)] = new_item
+    # Save to csv files
+    grocery_list.to_csv(GROCERIES_FILE, index=False)
+    recipe_book.to_csv(RECIPES_FILE, index=False)
 
 # Tkinter
 def main():
@@ -326,9 +372,13 @@ def main():
     list_lb.bind('<<ListboxSelect>>', lambda event: on_select(event, list_lb.curselection(),
                                                               recipe_tb, recipes_list))
 
-    # Add - Frame, Label
-    add_frame = tk.Frame(root)
-    add_frame.pack(side=tk.TOP, padx=padding, pady=padding)
+    # Add/Remove - Frame, Label
+    add_remove_frame = tk.Frame(root)
+    add_remove_frame.pack(side=tk.TOP, padx=padding, pady=padding)
+
+    # Update - Frame, Label
+    update_frame = tk.Frame(root)
+    update_frame.pack(side=tk.TOP, padx=padding)
 
     # Buttons
     sort_button = tk.Button(sort_frame, text="Sort",
@@ -336,13 +386,20 @@ def main():
                             command= lambda: sort(sort_by.get(), list_lb))
     sort_button.pack(side=tk.LEFT, padx=padding, pady=padding)
 
-    add_button = tk.Button(add_frame, text="Add to Groceries",
-                           width=button_w*2, height=button_h, command=add)
+    add_button = tk.Button(add_remove_frame, text="Add to Groceries",
+                           width=button_w*2, height=button_h,
+                           command=lambda: add(list_lb.curselection(), list_lb))
     add_button.pack(side=tk.LEFT, padx=padding, pady=padding)
 
-    remove_button = tk.Button(add_frame, text="Remove from Groceries",
-                              width=button_w*2, height=button_h, command=remove)
+    remove_button = tk.Button(add_remove_frame, text="Remove from Groceries",
+                              width=button_w*2, height=button_h,
+                              command=lambda: remove(list_lb.curselection(), list_lb))
     remove_button.pack(side=tk.LEFT, padx=padding, pady=padding)
+
+    update_button = tk.Button(update_frame, text="Update Groceries List",
+                              width=button_w*2, height=button_h,
+                              command=lambda: update_groceries(recipes_list))
+    update_button.pack(side=tk.LEFT, padx=padding)
 
     # Main Loop
     root.mainloop()
