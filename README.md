@@ -14,7 +14,7 @@ The user can easily sort the recipe list by the following:
   - `Makable`: if the user has all ingredients in the fridge
   - `Total Cook Time`: ascending
 
-## Notes on Update Grocery List
+## Update Grocery List - Limitations
 Each time `Update Grocery List` is clicked, the number of items in the to buy list are updated. 
 If the recipe is `makable`, the grocery list will not be changed, as all ingredients are in the fridge at sufficient amounts.
 For the foods that are insufficiently stocked, the difference is added to the to buy list each time `Update Grocery List` is clicked.
