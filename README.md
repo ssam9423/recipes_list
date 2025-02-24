@@ -14,11 +14,6 @@ The user can easily sort the recipe list by the following:
   - `Makable`: if the user has all ingredients in the fridge
   - `Total Cook Time`: ascending
 
-## Update Grocery List - Limitations
-Each time `Update Grocery List` is clicked, the number of items in the to buy list are updated. 
-If the recipe is `makable`, the grocery list will not be changed, as all ingredients are in the fridge at sufficient amounts.
-For the foods that are insufficiently stocked, the difference is added to the to buy list each time `Update Grocery List` is clicked.
-The program does not properly account for the same recipe being added ot the grocery list multiple times.
 
 ## CSV File Requirements - Recipe List
 The csv file for requires the following column names:
@@ -28,6 +23,7 @@ The csv file for requires the following column names:
   - `cook_time`: (`int`) the cook time in minutes
   - `directions`: (`String`) a list of directions, each step seperated by commas
   - `add_to_groceries`: (`int`) determines the amount of the recipe that will be added to the user's grocery list
+
 
 ## Adapting the Code
 Adapting the code is simple, the user just needs to change the `RECIPES_FILE` and `GROCERIES_FILE` to the name of their csv files.
