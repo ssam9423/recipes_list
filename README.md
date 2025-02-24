@@ -27,7 +27,7 @@ The csv file for requires the following column names:
   - `prep_time`: (`int`) the prep time in minutes
   - `cook_time`: (`int`) the cook time in minutes
   - `directions`: (`String`) a list of directions, each step seperated by commas
-  - `add_to_groceries`: (`Boolean`) determines if the recipe will be added to the user's grocery list
+  - `add_to_groceries`: (`int`) determines the amount of the recipe that will be added to the user's grocery list
 
 ## Adapting the Code
 Adapting the code is simple, the user just needs to change the `RECIPES_FILE` and `GROCERIES_FILE` to the name of their csv files.
