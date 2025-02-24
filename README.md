@@ -2,12 +2,13 @@
 ## Description
 A simple python program using tkinter to display recipes.
 
+The number preceeding the recipe name is the amount that the user has added to their grocery list.
 The user can click on the recipe they would like to look at.
 Any recipes that are makable (all ingredients are in the user's fridge with sufficient amounts of each) are highlighted in light green.
 Any recipes that are added to the user's grocery list (if the user's fridge does not have the sufficient amount of each ingredient, they are added to the to buy list) are highlighted in light blue.
 To update the user's grocery list, `Update Grocery List` must be clicked.
 
-<img src="https://github.com/user-attachments/assets/fbd0ddad-c66a-4a1c-ba2b-251499838f2c" width="510" height="340"/>
+<img src="https://github.com/user-attachments/assets/c0c80415-dee1-4204-8267-24212ca7d213" width="510" height="340"/>
 
 The user can easily sort the recipe list by the following:
   - `Recipe Name`: alphabetically
